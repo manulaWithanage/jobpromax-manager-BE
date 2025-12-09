@@ -1,8 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
 from app.config import settings
-from app.routes import tasks, roadmap, features, dashboard
+from app.auth import verify_token
+from app.routes import tasks, roadmap, features, dashboard, users
 
 app = FastAPI(title="JobProMax Progress Hub API")
 
@@ -24,7 +25,9 @@ async def root():
     return {"message": "Welcome to JobProMax Progress Hub API"}
 
 # Include Routers
-app.include_router(tasks.router, tags=["Tasks"])
-app.include_router(roadmap.router, tags=["Roadmap"])
-app.include_router(features.router, tags=["Features"])
-app.include_router(dashboard.router, tags=["Dashboard"])
+# Include Routers
+app.include_router(users.router, prefix="/users", tags=["Users"]) # Auth handled internally
+app.include_router(tasks.router, tags=["Tasks"], dependencies=[Depends(verify_token)])
+app.include_router(roadmap.router, tags=["Roadmap"], dependencies=[Depends(verify_token)])
+app.include_router(features.router, tags=["Features"], dependencies=[Depends(verify_token)])
+app.include_router(dashboard.router, tags=["Dashboard"], dependencies=[Depends(verify_token)])

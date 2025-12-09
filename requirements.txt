@@ -2,5 +2,8 @@ fastapi
 uvicorn[standard]
 beanie
 motor
+pytest-asyncio
+httpx
+pyjwt[crypto]
 pydantic-settings
 python-dotenv

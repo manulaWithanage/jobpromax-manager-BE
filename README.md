@@ -66,6 +66,13 @@ Interactive API docs (Swagger UI) are available at:
 - **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
+## Deployment (Render)
+If deploying manually to Render:
+1.  **Build Command**: `pip install -r requirements.txt`
+2.  **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+    - *Note: Using `0.0.0.0` is required for Render's health checks to succeed.*
+
+
 ## Project Structure
 ```
 .
