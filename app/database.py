@@ -1,11 +1,12 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-import certifi
 from beanie import init_beanie
 from app.config import settings
 from app.models.task import Task
 from app.models.roadmap import RoadmapPhase
 from app.models.feature import Feature
 from app.models.dashboard import KPI, PipelineItem, ChartData
+
+import certifi
 
 async def init_db():
     client = AsyncIOMotorClient(settings.MONGODB_URI, tlsCAFile=certifi.where())
