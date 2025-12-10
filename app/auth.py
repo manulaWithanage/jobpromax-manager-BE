@@ -1,61 +1,58 @@
-import jwt
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.config import settings
-import httpx
+from fastapi import Depends, HTTPException, status, Request
+from app.utils.security import decode_access_token
+from app.models.user import User, UserRole
 
-security = HTTPBearer()
-
-async def get_jwks():
-    if not settings.CLERK_ISSUER:
-        # Fallback or error if issuer not set
-        return None
+async def get_current_user(request: Request) -> User:
+    """Extract and validate JWT from cookie, return User object."""
+    token = request.cookies.get("auth-token")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
     
-    jwks_url = f"{settings.CLERK_ISSUER}/.well-known/jwks.json"
-    async with httpx.AsyncClient() as client:
-        response = await client.get(jwks_url)
-        return response.json()
-
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    token = credentials.credentials
+    payload = decode_access_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
     
-    try:
-        # If PEM key is provided directly (easier for some setups)
-        if settings.CLERK_PEM_PUBLIC_KEY:
-            key = settings.CLERK_PEM_PUBLIC_KEY
-            # Ensure headers/footers if missing? Usually user provides full PEM.
-            payload = jwt.decode(token, key, algorithms=["RS256"], audience=None, issuer=settings.CLERK_ISSUER if settings.CLERK_ISSUER else None)
-        else:
-            # JWKS Logic
-            # Note: For production, caching JWKS is recommended. 
-            # PyJWT can handle JWKS via PyJWKClient but we added 'pyjwt[crypto]' which includes it? 
-            # Actually PyJWT's PyJWKClient is good. Let's use it if available or manual.
-            # Simpler manual approach for now or use jwt.PyJWKClient if imported.
-            from jwt import PyJWKClient
-            if not settings.CLERK_ISSUER:
-                 raise HTTPException(status_code=500, detail="Clerk Issuer not configured")
-            
-            jwks_client = PyJWKClient(f"{settings.CLERK_ISSUER}/.well-known/jwks.json")
-            signing_key = jwks_client.get_signing_key_from_jwt(token)
-            payload = jwt.decode(
-                token,
-                signing_key.key,
-                algorithms=["RS256"],
-                audience=None, # Clerk often doesn't enforce strict audience on frontend tokens unless configured
-                issuer=settings.CLERK_ISSUER
+    user_id = payload.get("sub")
+    user = await User.get(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+    
+    return user
+
+async def verify_token(request: Request) -> dict:
+    """Dependency that just returns the token payload (for router-level auth)."""
+    token = request.cookies.get("auth-token")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+    
+    payload = decode_access_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+    
+    return payload
+
+def require_role(allowed_roles: list[UserRole]):
+    """Factory for role-based access control."""
+    async def role_checker(user: User = Depends(get_current_user)):
+        if user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions"
             )
-            
-        return payload
-        
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except jwt.InvalidTokenError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {str(e)}",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        return user
+    return role_checker

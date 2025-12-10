@@ -5,6 +5,7 @@ from app.models.task import Task
 from app.models.roadmap import RoadmapPhase
 from app.models.feature import Feature
 from app.models.dashboard import KPI, PipelineItem, ChartData
+from app.models.user import User
 
 import certifi
 
@@ -20,6 +21,7 @@ async def init_db():
             Feature,
             KPI,
             PipelineItem,
-            ChartData
+            ChartData,
+            User
         ]
     )

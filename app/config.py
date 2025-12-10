@@ -4,14 +4,16 @@ from typing import List
 class Settings(BaseSettings):
     MONGODB_URI: str
     DATABASE_NAME: str = "progress_hub"
-    CLERK_SECRET_KEY: str = ""
-    CLERK_ISSUER: str = "" # URL of the Clerk instance (e.g., https://clerk.your-domain.com or https://api.clerk.com/v1/...)
-    CLERK_PEM_PUBLIC_KEY: str = "" # Optional if using PEM directly
-    SUPER_ADMIN_EMAIL: str = ""
-
+    
+    # JWT Settings
+    JWT_SECRET: str = "change-this-secret-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000"]
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
 settings = Settings()
