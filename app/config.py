@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     # JWT Settings
     JWT_SECRET: str = "change-this-secret-in-production"
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    JWT_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days (10080 minutes)
     
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000"]
 

@@ -36,7 +36,7 @@ async def login(request: LoginRequest, response: Response):
         httponly=True,
         secure=True,  # Set to False for local dev if not using HTTPS
         samesite="lax",
-        max_age=60 * 60 * 24  # 24 hours
+        max_age=60 * 60 * 24 * 7  # 7 days (604800 seconds)
     )
     
     return {"message": "Login successful", "user": UserResponse(
