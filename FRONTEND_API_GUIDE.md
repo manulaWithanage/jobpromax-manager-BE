@@ -2,7 +2,7 @@
 
 ## Base URL
 - **Local**: `http://localhost:8000`
-- **Production**: `https://your-render-url.onrender.com`
+- **Production**: `https://jobpromax-manager-be-2.onrender.com`
 
 ## Authentication
 
