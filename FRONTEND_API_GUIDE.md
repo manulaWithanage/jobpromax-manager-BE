@@ -57,24 +57,178 @@ GET /auth/me
 Since auth uses **HTTP-only cookies**, include `credentials: 'include'` in all requests:
 
 ```typescript
-// Example: Login
-const login = async (email: string, password: string) => {
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',  // REQUIRED for cookies
-    body: JSON.stringify({ email, password })
-  });
-  return res.json();
-};
+// lib/api.ts
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-// Example: Fetch protected data
-const getTasks = async () => {
-  const res = await fetch(`${API_BASE}/tasks`, {
-    credentials: 'include'  // REQUIRED
+// Generic fetch wrapper
+async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    credentials: 'include', // REQUIRED for cookies
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
+  
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || 'API Error');
+  }
+  
   return res.json();
+}
+```
+
+---
+
+## Frontend Implementation Examples
+
+### 1. Auth Service
+```typescript
+// services/auth.ts
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: 'manager' | 'developer' | 'leadership';
+}
+
+interface LoginResponse {
+  message: string;
+  user: User;
+}
+
+export const authService = {
+  login: async (email: string, password: string): Promise<LoginResponse> => {
+    return apiFetch('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  },
+
+  logout: async (): Promise<void> => {
+    await apiFetch('/auth/logout', { method: 'POST' });
+  },
+
+  getCurrentUser: async (): Promise<User> => {
+    return apiFetch('/auth/me');
+  },
 };
+```
+
+### 2. Auth Context (React)
+```tsx
+// context/AuthContext.tsx
+import { createContext, useContext, useState, useEffect } from 'react';
+
+const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user is logged in on mount
+    authService.getCurrentUser()
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    const { user } = await authService.login(email, password);
+    setUser(user);
+    return user;
+  };
+
+  const logout = async () => {
+    await authService.logout();
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export const useAuth = () => useContext(AuthContext);
+```
+
+### 3. Login Page
+```tsx
+// pages/login.tsx
+import { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+
+export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const { login } = useAuth();
+  const router = useRouter();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await login(email, password);
+      router.push('/dashboard');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input value={email} onChange={(e) => setEmail(e.target.value)} />
+      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+      {error && <p>{error}</p>}
+      <button type="submit">Login</button>
+    </form>
+  );
+}
+```
+
+### 4. Protected Route Wrapper
+```tsx
+// components/ProtectedRoute.tsx
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+
+export function ProtectedRoute({ children, allowedRoles = [] }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+    if (!loading && user && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+      router.push('/unauthorized');
+    }
+  }, [user, loading]);
+
+  if (loading) return <div>Loading...</div>;
+  if (!user) return null;
+
+  return children;
+}
+```
+
+### 5. Fetching Protected Data
+```typescript
+// Example: Fetch tasks
+const tasks = await apiFetch('/tasks');
+
+// Example: Update task
+await apiFetch(`/tasks/${taskId}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ status: 'Done' }),
+});
 ```
 
 ---
