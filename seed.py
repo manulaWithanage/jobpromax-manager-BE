@@ -4,6 +4,8 @@ from app.models.task import Task, TaskStatus, TaskPriority
 from app.models.roadmap import RoadmapPhase, Deliverable, DeliverableStatus, PhaseStatus, HealthStatus
 from app.models.feature import Feature, FeatureStatusEnum
 from app.models.dashboard import KPI, PipelineItem, PipelineType, PipelinePriority, ChartData, ChartDataPoint
+from app.models.user import User, UserRole
+from app.utils.security import hash_password
 
 async def seed_data():
     await init_db()
@@ -15,6 +17,32 @@ async def seed_data():
     await KPI.delete_all()
     await PipelineItem.delete_all()
     await ChartData.delete_all()
+    await User.delete_all()
+    
+    # Seed Users
+    users = [
+        User(
+            email="manager@jobpromax.com",
+            name="Manager User",
+            password_hash=hash_password("manager123"),
+            role=UserRole.MANAGER
+        ),
+        User(
+            email="developer@jobpromax.com",
+            name="Developer User",
+            password_hash=hash_password("dev123"),
+            role=UserRole.DEVELOPER
+        ),
+        User(
+            email="leadership@jobpromax.com",
+            name="Leadership User",
+            password_hash=hash_password("lead123"),
+            role=UserRole.LEADERSHIP
+        )
+    ]
+    for user in users:
+        await user.insert()
+    print("Users seeded.")
 
     # Tasks
     tasks = [
