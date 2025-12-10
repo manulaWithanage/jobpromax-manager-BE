@@ -34,7 +34,7 @@ async def login(request: LoginRequest, response: Response):
         key="auth-token",
         value=token,
         httponly=True,
-        secure=True,  # Set to False for local dev if not using HTTPS
+        secure=False,  # Set to True in production (HTTPS)
         samesite="lax",
         max_age=60 * 60 * 24 * 7  # 7 days (604800 seconds)
     )
