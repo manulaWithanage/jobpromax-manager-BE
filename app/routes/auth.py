@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Response, Request
 from pydantic import BaseModel, EmailStr
 from app.models.user import User
+from app.models.activity import ActivityLog, ActionType
 from app.utils.security import verify_password, create_access_token, decode_access_token
 
 router = APIRouter()
@@ -39,6 +40,15 @@ async def login(request: LoginRequest, response: Response):
         max_age=60 * 60 * 24 * 7  # 7 days (604800 seconds)
     )
     
+    # Log LOGIN activity
+    activity = ActivityLog(
+        userId=user.id,
+        userName=user.name,
+        userRole=user.role.value,
+        action=ActionType.LOGIN
+    )
+    await activity.insert()
+    
     return {"message": "Login successful", "user": UserResponse(
         id=str(user.id),
         name=user.name,
@@ -47,7 +57,24 @@ async def login(request: LoginRequest, response: Response):
     )}
 
 @router.post("/logout")
-async def logout(response: Response):
+async def logout(response: Response, req: Request):
+    # Try to get user from token before clearing cookie
+    token = req.cookies.get("auth-token")
+    if token:
+        payload = decode_access_token(token)
+        if payload:
+            user_id = payload.get("sub")
+            user = await User.get(user_id)
+            if user:
+                # Log LOGOUT activity
+                activity = ActivityLog(
+                    userId=user.id,
+                    userName=user.name,
+                    userRole=user.role.value,
+                    action=ActionType.LOGOUT
+                )
+                await activity.insert()
+    
     response.delete_cookie(key="auth-token")
     return {"message": "Logged out successfully"}
 
@@ -72,3 +99,4 @@ async def get_current_user(request: Request):
         email=user.email,
         role=user.role.value
     )
+

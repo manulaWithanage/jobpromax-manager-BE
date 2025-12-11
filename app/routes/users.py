@@ -4,7 +4,9 @@ from pydantic import BaseModel, EmailStr
 from beanie import PydanticObjectId
 from app.auth import get_current_user, require_role
 from app.models.user import User, UserRole
+from app.models.activity import ActionType, TargetType
 from app.utils.security import hash_password
+from app.utils.activity_logger import log_activity
 
 router = APIRouter()
 
@@ -52,6 +54,15 @@ async def create_user(
     )
     await new_user.insert()
     
+    # Log USER_CREATED activity
+    await log_activity(
+        user=current_user,
+        action=ActionType.USER_CREATED,
+        target_type=TargetType.USER,
+        target_id=new_user.id,
+        target_name=new_user.name
+    )
+    
     return UserResponse(
         id=str(new_user.id),
         name=new_user.name,
@@ -77,5 +88,17 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    user_name = user.name
     await user.delete()
+    
+    # Log USER_DELETED activity
+    await log_activity(
+        user=current_user,
+        action=ActionType.USER_DELETED,
+        target_type=TargetType.USER,
+        target_id=PydanticObjectId(user_id),
+        target_name=user_name
+    )
+    
     return {"message": "User deleted successfully", "id": user_id}
+
