@@ -1,21 +1,41 @@
 from fastapi import Depends, HTTPException, status, Request
+from fastapi.security import OAuth2PasswordBearer
+from typing import Optional
 from app.utils.security import decode_access_token
 from app.models.user import User, UserRole
 
-async def get_current_user(request: Request) -> User:
-    """Extract and validate JWT from cookie, return User object."""
-    token = request.cookies.get("auth-token")
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-        )
+# OAuth2 scheme for Swagger UI - makes token optional to also support cookies
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
+
+async def get_token_from_request(request: Request, token: Optional[str] = Depends(oauth2_scheme)) -> str:
+    """Extract token from Bearer header or cookie."""
+    # Priority 1: Bearer token from header (for Swagger)
+    if token:
+        return token
     
-    payload = decode_access_token(token)
+    # Priority 2: Cookie (for browser clients)
+    cookie_token = request.cookies.get("auth-token")
+    if cookie_token:
+        return cookie_token
+    
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+async def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_scheme)) -> User:
+    """Extract and validate JWT from header or cookie, return User object."""
+    auth_token = await get_token_from_request(request, token)
+    
+    payload = decode_access_token(auth_token)
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     
     user_id = payload.get("sub")
@@ -24,27 +44,26 @@ async def get_current_user(request: Request) -> User:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     
     return user
 
-async def verify_token(request: Request) -> dict:
+
+async def verify_token(request: Request, token: Optional[str] = Depends(oauth2_scheme)) -> dict:
     """Dependency that just returns the token payload (for router-level auth)."""
-    token = request.cookies.get("auth-token")
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-        )
+    auth_token = await get_token_from_request(request, token)
     
-    payload = decode_access_token(token)
+    payload = decode_access_token(auth_token)
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     
     return payload
+
 
 def require_role(allowed_roles: list[UserRole]):
     """Factory for role-based access control."""
