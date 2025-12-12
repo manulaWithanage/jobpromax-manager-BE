@@ -1,18 +1,18 @@
 from fastapi import Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
 from app.utils.security import decode_access_token
 from app.models.user import User, UserRole
 
-# OAuth2 scheme for Swagger UI - makes token optional to also support cookies
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+# HTTP Bearer scheme for Swagger UI - simple token input
+security = HTTPBearer(auto_error=False)
 
 
-async def get_token_from_request(request: Request, token: Optional[str] = Depends(oauth2_scheme)) -> str:
+async def get_token_from_request(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> str:
     """Extract token from Bearer header or cookie."""
     # Priority 1: Bearer token from header (for Swagger)
-    if token:
-        return token
+    if credentials:
+        return credentials.credentials
     
     # Priority 2: Cookie (for browser clients)
     cookie_token = request.cookies.get("auth-token")
@@ -26,9 +26,9 @@ async def get_token_from_request(request: Request, token: Optional[str] = Depend
     )
 
 
-async def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_scheme)) -> User:
+async def get_current_user(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> User:
     """Extract and validate JWT from header or cookie, return User object."""
-    auth_token = await get_token_from_request(request, token)
+    auth_token = await get_token_from_request(request, credentials)
     
     payload = decode_access_token(auth_token)
     if not payload:
@@ -50,9 +50,9 @@ async def get_current_user(request: Request, token: Optional[str] = Depends(oaut
     return user
 
 
-async def verify_token(request: Request, token: Optional[str] = Depends(oauth2_scheme)) -> dict:
+async def verify_token(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> dict:
     """Dependency that just returns the token payload (for router-level auth)."""
-    auth_token = await get_token_from_request(request, token)
+    auth_token = await get_token_from_request(request, credentials)
     
     payload = decode_access_token(auth_token)
     if not payload:
