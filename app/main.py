@@ -5,7 +5,7 @@ from app.config import settings
 from app.auth import verify_token
 from app.routes import tasks, roadmap, features, dashboard, users, auth, reports, activities
 
-app = FastAPI(title="JobProMax Progress Hub API")
+app = FastAPI(title="JobProMax Progress Hub API", redirect_slashes=False)
 
 # CORS Middleware
 app.add_middleware(
